@@ -41,7 +41,7 @@ insert into auth.users (instance_id, id, aud, role, email, encrypted_password, e
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
   confirmation_token, email_change, email_change_token_new, recovery_token)
 select '00000000-0000-0000-0000-000000000000', id, 'authenticated', 'authenticated', email,
-  crypt('ToolConnect#2026', gen_salt('bf')), now(),
+  extensions.crypt('ToolConnect#2026', extensions.gen_salt('bf')), now(),
   jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email'), 'role', role, 'employee_code', code),
   jsonb_build_object('full_name', full_name, 'job_title', title, 'phone', phone),
   now() - interval '120 days', now(), '', '', '', ''

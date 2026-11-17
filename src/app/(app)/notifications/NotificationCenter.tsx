@@ -96,7 +96,7 @@ export function NotificationCenter({ initial, userId }: { initial: NotificationR
                 )}
                 {!n.is_read && <span className="sr-only"> (unread)</span>}
                 {n.body && <p className="text-sm text-zinc-700 dark:text-zinc-300">{n.body}</p>}
-                <time className="text-xs text-zinc-500" dateTime={n.created_at} title={fmtDateTime(n.created_at)}>{timeAgo(n.created_at)}</time>
+                <time className="text-xs text-zinc-500" dateTime={n.created_at} title={fmtDateTime(n.created_at)} suppressHydrationWarning>{timeAgo(n.created_at)}</time>
               </div>
               {!n.is_read && (
                 <button className="btn btn-ghost btn-sm" onClick={() => markRead([n.id])} aria-label={`Mark "${n.title}" as read`}>Mark read</button>

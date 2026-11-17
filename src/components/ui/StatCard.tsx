@@ -11,13 +11,13 @@ export function StatCard({ label, value, icon: Icon, href, accent = "default", h
     blue: "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200",
   };
   const body = (
-    <div className="card card-pad flex h-full items-center gap-4 transition hover:border-brand-yellow">
+    <div className="card card-pad flex h-full items-center gap-3 transition hover:border-brand-yellow">
       <div className={cn("rounded-xl p-3", accents[accent])}>
         <Icon className="h-6 w-6" aria-hidden />
       </div>
       <div className="min-w-0">
         <div className="text-2xl font-extrabold tabular-nums sm:text-3xl">{value}</div>
-        <div className="truncate text-sm font-semibold text-zinc-600 dark:text-zinc-400">{label}</div>
+        <div className="text-sm font-semibold leading-tight text-zinc-600 dark:text-zinc-400">{label}</div>
         {hint && <div className="text-xs text-zinc-500">{hint}</div>}
       </div>
     </div>
