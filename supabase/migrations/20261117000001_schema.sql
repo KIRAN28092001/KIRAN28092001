@@ -239,7 +239,7 @@ create sequence public.request_number_seq start 1001;
 create table public.tool_requests (
   id                     uuid primary key default gen_random_uuid(),
   request_number         text not null unique default ('REQ-' || nextval('public.request_number_seq')),
-  parent_tool_id         uuid not null references public.parent_tools (id) on delete cascade,
+  parent_tool_id         uuid not null references public.parent_tools (id) on delete restrict,
   requester_id           uuid not null references public.profiles (id) on delete cascade,
   project_id             uuid not null references public.projects (id),
   reason                 text not null check (length(trim(reason)) >= 3),
@@ -282,7 +282,7 @@ create index request_approvals_request_idx on public.request_approvals (request_
 -- ---------------------------------------------------------------------
 create table public.checkouts (
   id                   uuid primary key default gen_random_uuid(),
-  unit_id              uuid not null references public.tool_units (id) on delete cascade,
+  unit_id              uuid not null references public.tool_units (id) on delete restrict,
   request_id           uuid references public.tool_requests (id) on delete set null,
   transfer_id          uuid,
   holder_id            uuid not null references public.profiles (id),
@@ -305,7 +305,7 @@ create sequence public.transfer_number_seq start 501;
 create table public.transfers (
   id                    uuid primary key default gen_random_uuid(),
   transfer_number       text not null unique default ('TRF-' || nextval('public.transfer_number_seq')),
-  unit_id               uuid not null references public.tool_units (id) on delete cascade,
+  unit_id               uuid not null references public.tool_units (id) on delete restrict,
   from_user_id          uuid not null references public.profiles (id),
   to_user_id            uuid not null references public.profiles (id),
   project_id            uuid not null references public.projects (id),
@@ -350,7 +350,7 @@ create index transfer_ack_transfer_idx on public.transfer_acknowledgments (trans
 
 create table public.returns (
   id          uuid primary key default gen_random_uuid(),
-  unit_id     uuid not null references public.tool_units (id) on delete cascade,
+  unit_id     uuid not null references public.tool_units (id) on delete restrict,
   checkout_id uuid references public.checkouts (id) on delete set null,
   project_id  uuid references public.projects (id) on delete set null,
   returned_by uuid not null references public.profiles (id),
@@ -409,7 +409,7 @@ create table public.audit_logs (
   action      text not null,
   entity_type text not null,
   entity_id   uuid,
-  unit_id     uuid references public.tool_units (id) on delete cascade,
+  unit_id     uuid references public.tool_units (id) on delete set null,
   project_id  uuid references public.projects (id) on delete set null,
   summary     text,
   details     jsonb not null default '{}'::jsonb,

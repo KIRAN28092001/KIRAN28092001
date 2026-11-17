@@ -1,0 +1,45 @@
+# Minimal Supabase CLI config for local development (`supabase start`).
+project_id = "tool-connected-app"
+
+[api]
+port = 54321
+schemas = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
+enabled = true
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+[storage]
+file_size_limit = "10MiB"
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback", "http://localhost:3000/reset-password"]
+jwt_expiry = 3600
+enable_signup = false
+minimum_password_length = 10
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+
+[auth.email.template.recovery]
+subject = "Reset your Tool Connected password"
+content_path = "./supabase/templates/recovery.html"
+
+[functions.send-notification-email]
+verify_jwt = false

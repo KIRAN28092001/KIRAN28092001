@@ -1,0 +1,5 @@
+<h2 style="font-family:Arial,sans-serif">Reset your Tool Connected password</h2>
+<p style="font-family:Arial,sans-serif">Someone (hopefully you) asked to reset the password for {{ .Email }}.</p>
+<p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password"
+      style="background:#F5B800;color:#1C1C1E;padding:12px 20px;border-radius:10px;font-weight:bold;text-decoration:none;font-family:Arial,sans-serif">Choose a new password</a></p>
+<p style="font-family:Arial,sans-serif;color:#666;font-size:12px">This link expires in 1 hour. If you didn't request it, ignore this e-mail.</p>

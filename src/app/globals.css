@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-stone-100 text-zinc-900 antialiased dark:bg-brand-coal dark:text-zinc-100;
+  }
+  /* Strong, visible focus ring for keyboard + glove-friendly use */
+  :focus-visible {
+    @apply outline-none ring-4 ring-brand-yellow ring-offset-2 ring-offset-white dark:ring-offset-zinc-900;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-zinc-200 bg-white shadow-card dark:border-zinc-800 dark:bg-zinc-900;
+  }
+  .card-pad {
+    @apply p-4 sm:p-5;
+  }
+  .btn {
+    @apply inline-flex min-h-[44px] select-none items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-lg {
+    @apply min-h-[56px] px-6 text-base;
+  }
+  .btn-sm {
+    @apply min-h-[36px] px-3 text-xs;
+  }
+  .btn-primary {
+    @apply bg-brand-yellow text-brand-charcoal hover:bg-brand-yellow-dark;
+  }
+  .btn-dark {
+    @apply bg-brand-charcoal text-white hover:bg-black dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white;
+  }
+  .btn-outline {
+    @apply border-2 border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800;
+  }
+  .btn-danger {
+    @apply bg-red-700 text-white hover:bg-red-800;
+  }
+  .btn-ghost {
+    @apply text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800;
+  }
+  .input {
+    @apply block min-h-[44px] w-full rounded-xl border-2 border-zinc-300 bg-white px-3 py-2 text-base text-zinc-900 placeholder:text-zinc-500 focus:border-brand-yellow-dark focus:outline-none focus:ring-4 focus:ring-brand-yellow/40 disabled:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-500;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-semibold text-zinc-800 dark:text-zinc-200;
+  }
+  .help {
+    @apply mt-1 text-xs text-zinc-600 dark:text-zinc-400;
+  }
+  .field-error {
+    @apply mt-1 text-sm font-medium text-red-700 dark:text-red-400;
+  }
+  .table {
+    @apply w-full text-left text-sm;
+  }
+  .table th {
+    @apply whitespace-nowrap border-b border-zinc-200 bg-zinc-50 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400;
+  }
+  .table td {
+    @apply border-b border-zinc-100 px-3 py-2.5 align-top dark:border-zinc-800;
+  }
+  .link {
+    @apply font-semibold text-amber-800 underline-offset-2 hover:underline dark:text-brand-yellow;
+  }
+  .chip {
+    @apply inline-flex min-h-[36px] items-center gap-1.5 rounded-full border-2 px-3 text-sm font-semibold transition-colors;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+  }
+}
