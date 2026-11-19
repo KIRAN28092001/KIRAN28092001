@@ -155,6 +155,10 @@ begin
   perform pg_temp.act(v_lead);
   perform public.decide_tool_request(v_req, true, 'Approved');
   select reserved_unit_id into v_unit from public.tool_requests where id = v_req;
+  -- warehouse picks the tool (pick ticket)
+  perform pg_temp.act('a0000000-0000-4000-8000-000000000002');
+  perform public.pick_ticket_pick((select id from public.pick_tickets where request_id = v_req and status = 'open'),
+    (select unit_code from public.tool_units where id = v_unit), null);
   perform pg_temp.act(pg_temp.u(p_emp));
   v := public.checkout_scan((select unit_code from public.tool_units where id = v_unit), null);
   v_co := (v ->> 'checkout_id')::uuid;
@@ -334,12 +338,16 @@ begin
   perform public.submit_tool_request(pg_temp.tool('Barrel-Grip Jigsaw'), pg_temp.prj('E'),
          'Cut openings for floor boxes', current_date + 3, null, null);
 
-  -- Approved and ready for collection
+  -- Approved: one picked & ready for pickup, one still waiting on the warehouse pick
   perform pg_temp.act(pg_temp.u('jamal.carter'));
   v := public.submit_tool_request(pg_temp.tool('18V Brushless Hammer Drill'), pg_temp.prj('D'),
          'Drill anchors for barrier rail', current_date + 5, null, null);
   perform pg_temp.act(pg_temp.u('lead.d'));
   perform public.decide_tool_request((v ->> 'id')::uuid, true, 'Pick up at Main Yard Bay 2');
+  perform pg_temp.act(pg_temp.u('inventory'));
+  perform public.pick_ticket_pick((select id from public.pick_tickets where request_id = (v ->> 'id')::uuid and status = 'open'),
+    (select u.unit_code from public.tool_units u join public.tool_requests r on r.reserved_unit_id = u.id where r.id = (v ->> 'id')::uuid),
+    'Staged on the Bay 2 pickup shelf');
   perform pg_temp.act(pg_temp.u('grace.thompson'));
   v := public.submit_tool_request(pg_temp.tool('48" Type 196-2 Level'), pg_temp.prj('C'),
          'Window rough opening checks', current_date + 3, null, null);

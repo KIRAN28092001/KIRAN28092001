@@ -13,7 +13,8 @@ Construction tool inventory, requests, approvals, transfers, barcode tracking an
 | **Auth** | E-mail/password sign-in, **badge (Employee ID) scan sign-in**, forgot/reset password, "remember me" (session-only cookies when unchecked), protected routes, role-based landing dashboards, logout. |
 | **Dashboards** | Labor: *Request Tool*, *Scan*, ready-for-collection, My Active Tools, My Project. Project Lead: pending approvals, transfers to acknowledge/review, overdue tools, project allocation. Admin / Inventory Manager: company KPIs (total, available, checked-out, pending, overdue, needs attention), tools by project, low-stock & maintenance alerts, recent activity. |
 | **Catalog / requests** | Instant client-side search across name, brand, category, parent code, unit barcode, serial, project, location; filters (category, availability, project, condition, location) and sorts (availability, name, recently added, most requested, category, project). Camera scan opens a request for that exact unit. Unavailable tools show who holds each unit, project, checkout date, due date and the **request queue** (names masked for labor outside their projects). |
-| **Request workflow** | Submit → a unit is *held* (Pending Approval) → lead approves/rejects with comment → unit **Reserved** for N hours → employee scans the **exact** barcode → **Checked Out**. Wrong unit scanned? If it is free it swaps the reservation, otherwise explains which unit is reserved. Uncollected reservations expire and return to stock automatically. When nothing is free the request queues; returned units are auto-offered to the next approved/queued request. |
+| **Request → pick → collect workflow** | Field request (search or scan) → a unit is *held* (Pending Approval) → Project Lead approves/rejects with comment → a warehouse **pick ticket** is created and Inventory Managers are alerted → the tool crib walks a printable **pick list** grouped by shelf and scans each unit to **stage** it (any available unit of that tool can be picked; the reservation follows the unit actually pulled) → the requester is notified *Ready for pickup* and the collection clock starts → the employee scans the **exact** staged unit → **Checked Out**. Employees cannot collect before the pick; staff collecting on someone's behalf pick and issue in one step. Uncollected staged tools expire back to stock. When nothing is free the request queues; returned units are auto-offered to the next request and go through the pick queue. |
+| **Invite-only users** | Accounts are created **only** when an Admin sends an invitation (name, e-mail, role, badge ID, projects). The invitee gets a one-time e-mail link to `/accept-invite`, sets a password and is activated with exactly the role and projects in the invitation. Admins can resend or revoke pending invitations. Any account created any other way (e.g. if public sign-ups were accidentally enabled) is **inactive** and cannot use the app. |
 | **Transfers** | Holder initiates (barcode, receiver, project, reason, condition, notes, photos) → unit **In Transfer** → receiver accepts by scanning or confirming (or declines) → lead/IM notified → lead approves, rejects (custody reverts) or flags. Full custody chain is preserved. |
 | **Check-in / returns** | Scan to return with condition Good / Damaged / Needs Maintenance / Missing, notes and photo evidence. Non-good returns block checkout, open a maintenance work order where relevant, and alert the Project Lead + Inventory Managers. |
 | **Inventory** | Parent tool + individual units. Parent code auto-generated from brand + type (`MIL-DRL-101`), units `MIL-DRL-101-01…`. Never duplicated (advisory lock + unique constraint). Photos in Supabase Storage. Add units, edit, archive, maintenance, status changes (damaged/missing/retired/clear). |
@@ -22,7 +23,7 @@ Construction tool inventory, requests, approvals, transfers, barcode tracking an
 | **Notifications** | Realtime in-app (Supabase Realtime) with unread badge, toasts, deep links, read/unread, clear. E-mail via Edge Function + Resend for: new request, approved/rejected, ready for collection, transfer initiated/completed/rejected/flagged, overdue, damaged/missing, maintenance due. |
 | **Reports** | Availability by type & project, checked out by employee, utilization (90 days), overdue, missing/damaged/maintenance, transfer history, requests by project & employee — each exportable to **CSV** and **PDF**. |
 | **Audit** | Immutable audit log of every workflow step and master-data change (with field-level diffs); per-unit activity timeline on every unit page. |
-| **Admin** | Users & roles (create users, change role, deactivate, send reset e-mail, badge IDs), project team management, organization settings, tool categories. |
+| **Admin** | Users & roles (invite users, resend/revoke invitations, change role, deactivate, send reset e-mail, badge IDs), project team management, organization settings, tool categories. |
 | **UX / a11y** | Mobile-first, bottom nav on phones, persistent sidebar on desktop, 44–60 px touch targets for gloved hands, high-contrast status colors with text labels, dark/light mode, skip link, visible focus rings, labelled inputs, `aria-live` toasts, confirmation dialogs for checkout/transfer/return/destructive actions, reduced-motion support. |
 
 ## Roles
@@ -35,6 +36,8 @@ Construction tool inventory, requests, approvals, transfers, barcode tracking an
 | Add / edit tools, units, maintenance, labels | ✅ | ✅ | ✅ | — |
 | Retire units | ✅ | — | ✅ | — |
 | Direct issue (walk-up checkout) | ✅ | ✅ own projects | ✅ | — |
+| Pick tickets (pull & stage approved tools) | ✅ | ✅ own projects | ✅ | — |
+| Invite users | ✅ | — | — | — |
 | See full custody details | ✅ | ✅ | ✅ | own projects |
 | Reports & audit log | ✅ all | ✅ own projects | ✅ all | — |
 | Users, roles, settings, projects | ✅ | team members of own projects | categories | — |
@@ -52,9 +55,11 @@ supabase/
     20261117000002_functions.sql         RLS helpers, workflow RPCs, triggers, housekeeping
     20261117000003_rls_views.sql         row level security, grants, v_catalog view
     20261117000004_storage_realtime_cron.sql  buckets, realtime publication, pg_cron job
+    20261117000005_security_hardening.sql     advisor fixes (function grants, search_path)
+    20261119000006_invites_pick_tickets.sql   invite-only onboarding, warehouse pick tickets
   seed.sql                               demo users, projects, 50 tools, live workflow history
   functions/send-notification-email/     Edge Function (Resend e-mail)
-  templates/recovery.html                password-reset e-mail template
+  templates/recovery.html, invite.html   password-reset and invitation e-mail templates
   config.toml                            Supabase CLI local config
 src/
   app/login, forgot-password, reset-password, auth/*   authentication
@@ -119,9 +124,14 @@ supabase db reset
 3. Load demo data: open **SQL Editor**, paste the contents of `supabase/seed.sql` and run it.
 4. **Project Settings → API**: copy URL, `anon` key and `service_role` key into `.env.local`.
 5. **Authentication → URL Configuration**: set *Site URL* to your app URL and add `https://YOUR_APP/auth/callback` and `https://YOUR_APP/reset-password` to *Redirect URLs*.
-6. **Authentication → Providers → Email**: disable public sign-ups (accounts are created by admins).
-7. **Authentication → Email Templates → Reset Password** (recommended, works across devices): use the content of `supabase/templates/recovery.html`, i.e. link to
-   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password`
+5b. Also add `https://YOUR_APP/accept-invite` to *Redirect URLs* (invitation links land there).
+6. **Authentication → Sign In / Providers**: turn **off** "Allow new users to sign up". Accounts are created only through admin invitations (anyone who still slips through is created inactive).
+7. **Authentication → Email Templates** (recommended — links then work even when opened on a different phone or computer):
+   - *Invite user*: use `supabase/templates/invite.html`, which links to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/accept-invite`
+   - *Reset Password*: use `supabase/templates/recovery.html`, which links to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password`
+   The default templates also work (the app reads the tokens from the link), but only in the browser that opens the link.
+7b. **Authentication → SMTP Settings**: Supabase's built-in e-mail service only delivers to members of your Supabase team and is rate-limited. Configure your own SMTP provider (e.g. Resend, SendGrid, Postmark) before inviting real employees.
+7c. The invitation and admin password-reset buttons call the server with `SUPABASE_SERVICE_ROLE_KEY`; make sure it is set wherever the app runs.
 8. **Database → Extensions**: `pg_cron` is enabled by migration 4 and schedules `run_housekeeping()` every 10 minutes (reservation expiry, overdue and maintenance-due alerts). If your plan lacks pg_cron, use the Vercel cron below.
 
 ### 3. E-mail notifications (optional but recommended)
@@ -174,7 +184,7 @@ All demo accounts use the password **`ToolConnect#2026`**.
 - Good, **damaged** and **needs-maintenance** returns, a **missing** unit, open and completed **maintenance** records, maintenance-due alerts
 - ~100 notifications and ~500 audit events generated by the real workflow functions
 
-Suggested walkthrough: sign in as **marcus.reed** → request a tool → sign in as **lead.a** → approve it (watch the realtime notification) → back as Marcus, open *Scanner → Collect* and type the reserved unit code → transfer it to **emily.nguyen** → sign in as Emily and accept → sign in as **inventory** and check it back in as *Damaged*.
+Suggested walkthrough: sign in as **marcus.reed** → request a tool → sign in as **lead.a** → approve it (watch the realtime notification) → sign in as **inventory** → *Pick Tickets* → **Pick** and scan the unit to stage it → back as Marcus (now notified *Ready for pickup*), open *Scanner → Collect* and scan the unit → transfer it to **emily.nguyen** → sign in as Emily and accept → as **inventory**, check it back in as *Damaged*. As **admin**, open *Users & Roles → Invite user* to onboard a new employee.
 
 ---
 

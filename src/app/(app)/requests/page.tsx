@@ -5,7 +5,7 @@ import { getProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { RequestStatusBadge } from "@/components/ui/StatusBadge";
+import { RequestStageBadge } from "@/components/ui/StatusBadge";
 import { ToolImage } from "@/components/ToolImage";
 import { DecisionButtons } from "@/components/tools/RequestActions";
 import { REQUEST_SELECT, type Row } from "@/lib/queries";
@@ -79,7 +79,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-extrabold">{r.parent?.name}</span>
-                      <RequestStatusBadge status={r.status} />
+                      <RequestStageBadge status={r.status} pick={r.pick} />
                     </div>
                     <p className="text-sm text-zinc-700 dark:text-zinc-300">
                       <span className="font-semibold">{r.requester?.full_name}</span> · {r.project?.name} · due back {fmtDate(r.expected_return_date)}

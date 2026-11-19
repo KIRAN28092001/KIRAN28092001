@@ -51,7 +51,7 @@ export function AppShell({ profile, unread, children }: { profile: Profile; unre
       </a>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-brand-charcoal text-white lg:flex" aria-label="Main navigation">
+      <aside className="no-print fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-brand-charcoal text-white lg:flex" aria-label="Main navigation">
         <div className="border-b border-white/10 px-5 py-5 [&_.text-zinc-500]:text-zinc-400">
           <Wordmark />
         </div>
@@ -75,7 +75,7 @@ export function AppShell({ profile, unread, children }: { profile: Profile; unre
       </aside>
 
       {/* Top bar */}
-      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 lg:pl-64">
+      <header className="no-print sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 lg:pl-64">
         <div className="flex h-16 items-center justify-between gap-2 px-3 sm:px-6">
           <div className="flex items-center gap-2 lg:hidden">
             <button className="btn btn-ghost px-3" onClick={() => setMenuOpen(true)} aria-label="Open menu" aria-expanded={menuOpen}>
@@ -124,12 +124,12 @@ export function AppShell({ profile, unread, children }: { profile: Profile; unre
         </div>
       )}
 
-      <main id="main" className="px-3 pb-28 pt-5 sm:px-6 lg:pb-10 lg:pl-[calc(16rem+1.5rem)]">
+      <main id="main" className="px-3 pb-28 pt-5 sm:px-6 lg:pb-10 lg:pl-[calc(16rem+1.5rem)] print:p-0">
         <div className="mx-auto max-w-7xl">{children}</div>
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-zinc-800 dark:bg-zinc-950 lg:hidden" aria-label="Quick navigation">
+      <nav className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-zinc-800 dark:bg-zinc-950 lg:hidden" aria-label="Quick navigation">
         <ul className="grid grid-cols-5">
           {mobileItems.map((item) => {
             const Icon = ICONS[item.icon];

@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ScanLine } from "lucide-react";
+import { Check, ScanLine } from "lucide-react";
 import { getProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { RequestStatusBadge } from "@/components/ui/StatusBadge";
+import { RequestStageBadge, requestStage } from "@/components/ui/StatusBadge";
 import { ToolImage } from "@/components/ToolImage";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { Section } from "@/components/lists";
 import { DecisionButtons, CancelRequestButton } from "@/components/tools/RequestActions";
+import { PickButton } from "../../pick-tickets/PickActions";
 import { AUDIT_SELECT, REQUEST_SELECT, type Row } from "@/lib/queries";
 import { fmtDate, fmtDateTime } from "@/lib/utils";
 
@@ -25,25 +26,60 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
     supabase.rpc("is_project_lead", { p_project: r.project_id }),
   ]);
   const mine = r.requester_id === profile.id;
+  const stage = requestStage(r.status, r.pick);
+  const activeTicket = ((r.pick ?? []) as Row[]).find((t) => t.status === "open" || t.status === "picked");
+  const canPick = profile.role === "admin" || profile.role === "inventory_manager" || isLead === true;
+  const steps = [
+    { label: "Submitted", done: true },
+    { label: "Approved", done: ["approved", "waitlisted", "fulfilled"].includes(r.status) },
+    { label: "Picked & staged", done: (r.status === "approved" && stage.stage === "ready") || r.status === "fulfilled" },
+    { label: "Collected", done: r.status === "fulfilled" },
+  ];
+  const closed = ["rejected", "cancelled", "expired"].includes(r.status);
   const canDecide = r.status === "pending" && !mine && (profile.role === "admin" || isLead === true);
   const canCancel = ["pending", "approved", "waitlisted"].includes(r.status) && (mine || profile.role === "admin" || profile.role === "inventory_manager" || isLead === true);
 
   return (
     <div className="space-y-5">
-      <PageHeader back={{ href: "/requests", label: "Requests" }} title={`${r.request_number}`} subtitle={<RequestStatusBadge status={r.status} />} />
+      <PageHeader back={{ href: "/requests", label: "Requests" }} title={`${r.request_number}`} subtitle={<RequestStageBadge status={r.status} pick={r.pick} />} />
 
-      {r.status === "approved" && (
+      {r.status === "approved" && stage.stage === "awaiting_pick" && (
+        <div className="flex flex-col gap-3 rounded-2xl border-4 border-violet-500 bg-violet-50 p-5 dark:bg-violet-950/40 sm:flex-row sm:items-center sm:justify-between" role="status">
+          <div>
+            <div className="text-lg font-extrabold text-violet-950 dark:text-violet-100">Approved — the warehouse is picking it</div>
+            <p className="text-sm text-violet-950 dark:text-violet-200">
+              Pick ticket <span className="font-mono font-bold">{stage.ticket}</span>. You&apos;ll be notified as soon as the tool is staged for pickup.
+            </p>
+          </div>
+          {canPick && activeTicket && (
+            <PickButton ticket={{ id: activeTicket.id, ticket_number: activeTicket.ticket_number, tool: r.parent?.name, suggested: r.unit?.unit_code ?? null, requester: r.requester?.full_name }} />
+          )}
+        </div>
+      )}
+      {r.status === "approved" && stage.stage === "ready" && (
         <div className="flex flex-col gap-3 rounded-2xl border-4 border-emerald-600 bg-emerald-50 p-5 dark:bg-emerald-950/40 sm:flex-row sm:items-center sm:justify-between" role="status">
           <div>
-            <div className="text-lg font-extrabold text-emerald-900 dark:text-emerald-100">Ready for collection</div>
+            <div className="text-lg font-extrabold text-emerald-900 dark:text-emerald-100">Ready for pickup</div>
             <p className="text-sm text-emerald-900 dark:text-emerald-200">
-              Unit <span className="font-mono font-bold">{r.unit?.unit_code}</span> is reserved until <strong>{fmtDateTime(r.reservation_expires_at)}</strong>. Scan its barcode to complete checkout.
+              Unit <span className="font-mono font-bold">{r.unit?.unit_code}</span> is staged{activeTicket?.pick_from ? <> at <strong>{activeTicket.pick_from}</strong></> : null} until <strong>{fmtDateTime(r.reservation_expires_at)}</strong>. Scan its barcode to complete checkout.
             </p>
           </div>
           {(mine || profile.role !== "labor") && (
             <Link href={`/scanner?mode=collect&request=${r.id}`} className="btn btn-primary btn-lg shrink-0"><ScanLine className="h-6 w-6" aria-hidden /> Scan to collect</Link>
           )}
         </div>
+      )}
+      {!closed && (
+        <ol className="grid grid-cols-4 gap-1" aria-label="Request progress">
+          {steps.map((st, i) => (
+            <li key={st.label} className="flex flex-col items-center gap-1 text-center">
+              <span className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold ${st.done ? "border-emerald-600 bg-emerald-600 text-white" : "border-zinc-300 bg-white text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900"}`}>
+                {st.done ? <Check className="h-5 w-5" aria-hidden /> : i + 1}
+              </span>
+              <span className={`text-xs font-semibold ${st.done ? "" : "text-zinc-500"}`}>{st.label}<span className="sr-only">{st.done ? " (done)" : " (not yet)"}</span></span>
+            </li>
+          ))}
+        </ol>
       )}
       {queuePos ? (
         <div className="rounded-2xl border-2 border-violet-300 bg-violet-50 p-4 text-sm font-semibold text-violet-950 dark:bg-violet-950/40 dark:text-violet-100" role="status">

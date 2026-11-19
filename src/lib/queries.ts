@@ -5,7 +5,17 @@ export const REQUEST_SELECT =
   " requester:profiles!tool_requests_requester_id_fkey(id, full_name, job_title)," +
   " decider:profiles!tool_requests_decided_by_fkey(full_name)," +
   " project:projects(id, name, code)," +
-  " unit:tool_units!tool_requests_reserved_unit_id_fkey(id, unit_code, status)";
+  " unit:tool_units!tool_requests_reserved_unit_id_fkey(id, unit_code, status)," +
+  " pick:pick_tickets(id, ticket_number, status, picked_at, pick_from)";
+
+export const PICK_SELECT =
+  "id, ticket_number, status, pick_from, notes, created_at, picked_at, completed_at, request_id, project_id, requester_id, unit_id, parent_tool_id," +
+  " request:tool_requests(id, request_number, reason, expected_return_date, status)," +
+  " parent:parent_tools(id, name, brand, parent_code, image_url, storage_location)," +
+  " unit:tool_units(id, unit_code, location, status)," +
+  " requester:profiles!pick_tickets_requester_id_fkey(id, full_name)," +
+  " picker:profiles!pick_tickets_picked_by_fkey(full_name)," +
+  " project:projects(id, name, code)";
 
 export const CHECKOUT_SELECT =
   "id, checked_out_at, expected_return_date, returned_at, status, project_id, holder_id, notes," +

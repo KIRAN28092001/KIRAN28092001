@@ -24,7 +24,7 @@ export function DecisionButtons({ requestId, requestNumber, toolName, requester,
     const res = data as { status: string; unit_code?: string };
     toast(
       "success",
-      mode === "reject" ? `${requestNumber} rejected.` : res.status === "waitlisted" ? `${requestNumber} approved — waitlisted until a unit is free.` : `${requestNumber} approved. ${res.unit_code} reserved for ${requester}.`
+      mode === "reject" ? `${requestNumber} rejected.` : res.status === "waitlisted" ? `${requestNumber} approved — waitlisted until a unit is free.` : `${requestNumber} approved. Pick ticket sent to the warehouse for ${res.unit_code}.`
     );
     setMode(null);
     setComment("");

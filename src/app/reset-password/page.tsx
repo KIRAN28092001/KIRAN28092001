@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { ensureSessionFromUrl } from "@/lib/supabase/hash-session";
 import { AuthFrame } from "@/components/auth/AuthFrame";
 
 function strength(pw: string) {
@@ -30,7 +31,7 @@ export default function ResetPasswordPage() {
     const { data: sub } = supabase.auth.onAuthStateChange((event: string) => {
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
     });
-    supabase.auth.getUser().then(({ data }: { data: { user: unknown } }) => setReady(!!data.user));
+    ensureSessionFromUrl().then((r) => setReady(r.ok));
     return () => sub.subscription.unsubscribe();
   }, []);
 

@@ -16,6 +16,7 @@ export const NAV: NavItem[] = [
   { href: "/scanner", label: "Scanner", icon: "ScanLine", roles: ALL, mobile: true },
   { href: "/my-tools", label: "My Tools", icon: "Wrench", roles: ALL, mobile: true },
   { href: "/requests", label: "Requests & Approvals", icon: "ClipboardCheck", roles: ALL },
+  { href: "/pick-tickets", label: "Pick Tickets", icon: "PackageCheck", roles: ["admin", "inventory_manager", "project_lead"] },
   { href: "/transfers", label: "Transfers", icon: "ArrowLeftRight", roles: ALL },
   { href: "/projects", label: "Projects", icon: "Building2", roles: ALL },
   { href: "/inventory", label: "Inventory", icon: "Boxes", roles: ["admin", "inventory_manager", "project_lead"] },

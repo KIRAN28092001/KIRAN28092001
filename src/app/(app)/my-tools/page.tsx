@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ToolImage } from "@/components/ToolImage";
 import { RequestList, TransferList, Section } from "@/components/lists";
 import { CHECKOUT_SELECT, REQUEST_SELECT, TRANSFER_SELECT, type Row } from "@/lib/queries";
+import { requestStage } from "@/components/ui/StatusBadge";
 import { fmtDate, isOverdue } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "My Tools" };
@@ -24,14 +25,21 @@ export default async function MyToolsPage() {
     supabase.from("transfers").select(TRANSFER_SELECT).eq("from_user_id", profile.id).eq("status", "pending_acknowledgment"),
   ]);
   const rows = (active ?? []) as Row[];
+  const readyRows = ((ready ?? []) as Row[]).filter((r) => requestStage(r.status, r.pick).stage === "ready");
+  const pickingRows = ((ready ?? []) as Row[]).filter((r) => requestStage(r.status, r.pick).stage !== "ready");
 
   return (
     <div className="space-y-5">
       <PageHeader title="My Tools" subtitle="Everything you are responsible for right now, plus your history." actions={<Link href="/catalog" className="btn btn-primary"><Search className="h-5 w-5" aria-hidden /> Request tool</Link>} />
 
-      {(ready?.length ?? 0) > 0 && (
-        <Section title="Ready for collection" action={<Link href="/scanner?mode=collect" className="btn btn-primary btn-sm">Scan to collect</Link>}>
-          <RequestList rows={ready as Row[]} showRequester={false} />
+      {readyRows.length > 0 && (
+        <Section title="Ready for pickup" action={<Link href="/scanner?mode=collect" className="btn btn-primary btn-sm">Scan to collect</Link>}>
+          <RequestList rows={readyRows} showRequester={false} />
+        </Section>
+      )}
+      {pickingRows.length > 0 && (
+        <Section title="Approved — warehouse is picking">
+          <RequestList rows={pickingRows} showRequester={false} />
         </Section>
       )}
       {(incoming?.length ?? 0) > 0 && (

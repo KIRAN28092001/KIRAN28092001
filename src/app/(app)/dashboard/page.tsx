@@ -9,9 +9,9 @@ import { StatCard } from "@/components/ui/StatCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { RequestList, CheckoutList, TransferList, Section } from "@/components/lists";
-import { ToolStatusBadge } from "@/components/ui/StatusBadge";
+import { ToolStatusBadge, requestStage } from "@/components/ui/StatusBadge";
 import { Badge } from "@/components/ui/Badge";
-import { AUDIT_SELECT, CHECKOUT_SELECT, REQUEST_SELECT, TRANSFER_SELECT, type Row } from "@/lib/queries";
+import { AUDIT_SELECT, CHECKOUT_SELECT, PICK_SELECT, REQUEST_SELECT, TRANSFER_SELECT, type Row } from "@/lib/queries";
 import { fmtDate, ROLE_LABEL } from "@/lib/utils";
 import type { DashboardStats } from "@/lib/types";
 
@@ -40,7 +40,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 /* ------------------------------------------------------------------ */
 async function LaborDashboard({ firstName, userId, stats }: { firstName: string; userId: string; stats: DashboardStats }) {
   const supabase = await createClient();
-  const [{ data: active }, { data: ready }, { data: open }, { data: incoming }, { data: projects }] = await Promise.all([
+  const [{ data: active }, { data: approved }, { data: openData }, { data: incoming }, { data: projects }] = await Promise.all([
     supabase.from("checkouts").select(CHECKOUT_SELECT).eq("holder_id", userId).eq("status", "active").order("expected_return_date"),
     supabase.from("tool_requests").select(REQUEST_SELECT).eq("requester_id", userId).eq("status", "approved").order("created_at"),
     supabase.from("tool_requests").select(REQUEST_SELECT).eq("requester_id", userId).in("status", ["pending", "waitlisted"]).order("created_at", { ascending: false }),
@@ -48,6 +48,8 @@ async function LaborDashboard({ firstName, userId, stats }: { firstName: string;
     supabase.from("project_members").select("member_role, project:projects(id, name, code, location, status)").eq("user_id", userId),
   ]);
 
+  const ready = ((approved ?? []) as Row[]).filter((r) => requestStage(r.status, r.pick).stage === "ready");
+  const open = [...((approved ?? []) as Row[]).filter((r) => requestStage(r.status, r.pick).stage !== "ready"), ...((openData ?? []) as Row[])];
   return (
     <div className="space-y-5">
       <PageHeader title={`Hi ${firstName} 👋`} subtitle="Request a tool, collect approved tools and manage what you're holding." />
@@ -69,9 +71,9 @@ async function LaborDashboard({ firstName, userId, stats }: { firstName: string;
         </Link>
       </div>
 
-      {(ready?.length ?? 0) > 0 && (
-        <Section title="✅ Ready for collection" action={<Link href="/scanner" className="btn btn-primary btn-sm">Scan to collect</Link>}>
-          <RequestList rows={ready as Row[]} showRequester={false} />
+      {ready.length > 0 && (
+        <Section title="✅ Ready for pickup" action={<Link href="/scanner" className="btn btn-primary btn-sm">Scan to collect</Link>}>
+          <RequestList rows={ready} showRequester={false} />
         </Section>
       )}
       {(incoming?.length ?? 0) > 0 && (
@@ -82,7 +84,7 @@ async function LaborDashboard({ firstName, userId, stats }: { firstName: string;
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="My active tools" value={stats.my_active} icon={PackageCheck} accent="blue" href="/my-tools" />
-        <StatCard label="My open requests" value={(open?.length ?? 0) + (ready?.length ?? 0)} icon={ClipboardCheck} accent="yellow" href="/requests" />
+        <StatCard label="My open requests" value={open.length + ready.length} icon={ClipboardCheck} accent="yellow" href="/requests" />
         <StatCard label="Overdue" value={stats.overdue} icon={AlertTriangle} accent={stats.overdue ? "red" : "default"} href="/my-tools" />
       </div>
 
@@ -111,7 +113,7 @@ async function LaborDashboard({ firstName, userId, stats }: { firstName: string;
             )}
           </Section>
           <Section title="Requests in progress" action={<Link href="/requests" className="link text-sm">All requests</Link>}>
-            <RequestList rows={(open ?? []) as Row[]} showRequester={false} empty="No pending requests." />
+            <RequestList rows={open} showRequester={false} empty="No pending requests." />
           </Section>
         </div>
       </div>
@@ -170,13 +172,14 @@ async function LeadDashboard({ firstName, userId, stats }: { firstName: string; 
 async function CompanyDashboard({ firstName, role, stats }: { firstName: string; role: "admin" | "inventory_manager"; stats: DashboardStats }) {
   const supabase = await createClient();
   const soon = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
-  const [{ data: pending }, { data: transfers }, { data: activity }, { data: catalog }, { data: attention }, { data: due }] = await Promise.all([
+  const [{ data: pending }, { data: transfers }, { data: activity }, { data: catalog }, { data: attention }, { data: due }, { data: picks }] = await Promise.all([
     supabase.from("tool_requests").select(REQUEST_SELECT).eq("status", "pending").order("created_at").limit(6),
     supabase.from("transfers").select(TRANSFER_SELECT).order("created_at", { ascending: false }).limit(6),
     supabase.from("audit_logs").select(AUDIT_SELECT).order("created_at", { ascending: false }).limit(12),
     supabase.from("v_catalog").select("id, name, parent_code, available_units, total_units, min_stock_threshold").eq("is_archived", false),
     supabase.from("tool_units").select("id, unit_code, status, parent:parent_tools(name)").in("status", ["maintenance", "damaged", "missing"]).order("updated_at", { ascending: false }).limit(10),
     supabase.from("tool_units").select("id, unit_code, status, next_maintenance_due, parent:parent_tools(name)").lte("next_maintenance_due", soon).neq("status", "retired").order("next_maintenance_due").limit(8),
+    supabase.from("pick_tickets").select(PICK_SELECT).eq("status", "open").order("created_at").limit(8),
   ]);
   const lowStock = ((catalog ?? []) as Row[]).filter((c) => c.available_units < c.min_stock_threshold).sort((a, b) => a.available_units - b.available_units);
   const im = role === "inventory_manager";
@@ -202,6 +205,21 @@ async function CompanyDashboard({ firstName, role, stats }: { firstName: string;
         <StatCard label="Overdue" value={stats.overdue} icon={Clock} accent={stats.overdue ? "red" : "default"} href="/reports?tab=overdue" />
         <StatCard label="Needs attention" value={stats.attention} icon={Wrench} accent={stats.attention ? "red" : "default"} href="/reports?tab=attention" />
       </div>
+
+      <Section title={`Pick tickets to fill (${(picks ?? []).length})`} action={<Link href="/pick-tickets" className="btn btn-primary btn-sm"><PackageCheck className="h-4 w-4" aria-hidden /> Open pick queue</Link>}>
+        {(picks ?? []).length === 0 ? (
+          <p className="py-4 text-center text-sm text-zinc-500">No approved requests waiting to be picked.</p>
+        ) : (
+          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {((picks ?? []) as Row[]).map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
+                <span className="min-w-0"><span className="font-mono font-bold">{t.ticket_number}</span> · <strong>{t.parent?.name}</strong> for {t.requester?.full_name} · {t.project?.name}</span>
+                <span className="text-xs text-zinc-500">Pick from {t.pick_from ?? "tool crib"}{t.unit?.unit_code ? ` · ${t.unit.unit_code}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
 
       <ProjectStats stats={stats} />
 

@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 
 /**
  * Token-hash verification (recommended Supabase SSR e-mail template):
- *   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password
+ *   recovery: {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password
+ *   invite:   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/accept-invite
  * Works even when the link is opened on a different device/browser.
  */
 export async function GET(request: NextRequest) {

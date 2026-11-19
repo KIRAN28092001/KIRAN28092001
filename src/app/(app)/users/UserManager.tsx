@@ -1,20 +1,20 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, Pencil, Search, UserPlus } from "lucide-react";
+import { KeyRound, Mail, Pencil, RefreshCw, Search, UserPlus, XCircle } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, ConfirmDialog } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
-import { ROLE_LABEL, errorMessage } from "@/lib/utils";
+import { ROLE_LABEL, errorMessage, fmtDateTime, timeAgo } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 import type { Row } from "@/lib/queries";
 
 const ROLES: Role[] = ["admin", "project_lead", "inventory_manager", "labor"];
 const ROLE_TONE = { admin: "red", project_lead: "blue", inventory_manager: "purple", labor: "gray" } as const;
 
-export function UserManager({ meId, users, members, projects, holding }: { meId: string; users: Row[]; members: Row[]; projects: Row[]; holding: Record<string, number> }) {
+export function UserManager({ meId, users, members, projects, holding, invitations }: { meId: string; users: Row[]; members: Row[]; projects: Row[]; holding: Record<string, number>; invitations: Row[] }) {
   const router = useRouter();
   const toast = useToast();
   const [q, setQ] = useState("");
@@ -23,11 +23,15 @@ export function UserManager({ meId, users, members, projects, holding }: { meId:
   const [create, setCreate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<Record<string, string | boolean | string[]>>({});
+  const [revoking, setRevoking] = useState<Row | null>(null);
+  const pending = invitations.filter((i) => i.status === "pending");
+  const pendingIds = new Set(pending.map((i) => i.auth_user_id));
 
   const shown = useMemo(() => {
     const t = q.toLowerCase();
-    return users.filter((u) => (role === "all" || u.role === role) && (!t || [u.full_name, u.email, u.employee_code, u.job_title].join(" ").toLowerCase().includes(t)));
-  }, [users, q, role]);
+    return users.filter((u) => !pendingIds.has(u.id) && (role === "all" || u.role === role) && (!t || [u.full_name, u.email, u.employee_code, u.job_title].join(" ").toLowerCase().includes(t)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users, q, role, invitations]);
   const projectsOf = (id: string) => members.filter((m) => m.user_id === id);
 
   function openEdit(u: Row) {
@@ -35,7 +39,7 @@ export function UserManager({ meId, users, members, projects, holding }: { meId:
     setEdit(u);
   }
   function openCreate() {
-    setForm({ full_name: "", email: "", password: "", role: "labor", employee_code: "", job_title: "", phone: "", project_ids: [] });
+    setForm({ full_name: "", email: "", role: "labor", employee_code: "", job_title: "", phone: "", project_ids: [] });
     setCreate(true);
   }
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value }));
@@ -54,12 +58,22 @@ export function UserManager({ meId, users, members, projects, holding }: { meId:
   }
   async function saveCreate() {
     setBusy(true);
-    const res = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    const res = await fetch("/api/admin/invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
     const body = await res.json().catch(() => ({}));
     setBusy(false);
-    if (!res.ok) return toast("error", body.error ?? "Could not create user");
-    toast("success", `${form.full_name} created`);
+    if (!res.ok) return toast("error", body.error ?? "Could not send invitation");
+    toast("success", `Invitation sent to ${form.email}`);
     setCreate(false);
+    router.refresh();
+  }
+  async function invitationAction(inv: Row, method: "PATCH" | "DELETE") {
+    setBusy(true);
+    const res = await fetch("/api/admin/invitations", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: inv.id }) });
+    const body = await res.json().catch(() => ({}));
+    setBusy(false);
+    setRevoking(null);
+    if (!res.ok) return toast("error", body.error ?? "Request failed");
+    toast("success", method === "PATCH" ? `Invitation re-sent to ${inv.email}` : `Invitation for ${inv.full_name} revoked`);
     router.refresh();
   }
   async function sendReset(u: Row) {
@@ -75,7 +89,37 @@ export function UserManager({ meId, users, members, projects, holding }: { meId:
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Users & Roles" subtitle={`${users.length} accounts · ${users.filter((u) => u.is_active).length} active`} actions={<button className="btn btn-primary" onClick={openCreate}><UserPlus className="h-5 w-5" aria-hidden /> Add user</button>} />
+      <PageHeader title="Users & Roles" subtitle={`${users.length - pending.length} accounts · ${pending.length} pending invitation${pending.length === 1 ? "" : "s"} · accounts are created by invitation only`} actions={<button className="btn btn-primary" onClick={openCreate}><UserPlus className="h-5 w-5" aria-hidden /> Invite user</button>} />
+
+      {invitations.length > 0 && (
+        <section className="card" aria-labelledby="inv-h">
+          <h2 id="inv-h" className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 text-base font-extrabold dark:border-zinc-800"><Mail className="h-5 w-5" aria-hidden /> Invitations</h2>
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead><tr><th scope="col">Invitee</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Sent</th><th scope="col">Invited by</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                {invitations.slice(0, 25).map((i) => (
+                  <tr key={i.id}>
+                    <td><div className="font-semibold">{i.full_name}</div><div className="text-xs text-zinc-500">{i.email}</div></td>
+                    <td><Badge tone={ROLE_TONE[i.role as Role]} dot={false}>{ROLE_LABEL[i.role as Role]}</Badge></td>
+                    <td>{i.status === "pending" ? <Badge tone="yellow">Pending</Badge> : i.status === "accepted" ? <Badge tone="green">Accepted {timeAgo(i.accepted_at)}</Badge> : <Badge tone="gray">Revoked</Badge>}</td>
+                    <td className="whitespace-nowrap text-xs" title={fmtDateTime(i.last_sent_at)}>{timeAgo(i.last_sent_at)}{i.send_count > 1 ? ` · sent ${i.send_count}×` : ""}</td>
+                    <td className="text-xs">{i.inviter?.full_name ?? "—"}</td>
+                    <td className="whitespace-nowrap">
+                      {i.status === "pending" && (
+                        <>
+                          <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => invitationAction(i, "PATCH")} aria-label={`Resend invitation to ${i.email}`} title="Resend"><RefreshCw className="h-4 w-4" /></button>
+                          <button className="btn btn-ghost btn-sm text-red-700" disabled={busy} onClick={() => setRevoking(i)} aria-label={`Revoke invitation for ${i.email}`} title="Revoke"><XCircle className="h-4 w-4" /></button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       <div className="card card-pad flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <label htmlFor="u-q" className="sr-only">Search users</label>
@@ -126,11 +170,11 @@ export function UserManager({ meId, users, members, projects, holding }: { meId:
         </div>
       </Dialog>
 
-      <Dialog open={create} onClose={() => setCreate(false)} title="Add user" size="lg" footer={<><button className="btn btn-outline" onClick={() => setCreate(false)}>Cancel</button><button className="btn btn-primary" onClick={saveCreate} disabled={busy}>{busy ? "Creating…" : "Create user"}</button></>}>
+      <Dialog open={create} onClose={() => setCreate(false)} title="Invite user" size="lg" footer={<><button className="btn btn-outline" onClick={() => setCreate(false)}>Cancel</button><button className="btn btn-primary" onClick={saveCreate} disabled={busy}>{busy ? "Sending…" : "Send invitation"}</button></>}>
+        <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">The person receives an e-mail with a one-time link to set their password. Their role and project access are fixed by this invitation and only take effect once they accept.</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {field("full_name", "Full name *")}
-          {field("email", "E-mail *", "email", { autoComplete: "off" })}
-          {field("password", "Temporary password * (10+ chars)", "password", { autoComplete: "new-password" })}
+          {field("email", "Work e-mail *", "email", { autoComplete: "off" })}
           <div><label htmlFor="u-role-c" className="label">Role *</label>
             <select id="u-role-c" className="input" value={String(form.role)} onChange={set("role")}>
               {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
@@ -152,6 +196,10 @@ export function UserManager({ meId, users, members, projects, holding }: { meId:
           </fieldset>
         </div>
       </Dialog>
+
+      <ConfirmDialog open={!!revoking} onClose={() => setRevoking(null)} onConfirm={() => revoking && invitationAction(revoking, "DELETE")} busy={busy} tone="danger" title="Revoke invitation?" confirmLabel="Revoke">
+        The link sent to {revoking?.email} stops working and the pending account is removed. You can invite them again later.
+      </ConfirmDialog>
     </div>
   );
 }

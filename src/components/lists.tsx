@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, CalendarClock } from "lucide-react";
-import { RequestStatusBadge, TransferStatusBadge, ReviewBadge } from "@/components/ui/StatusBadge";
+import { RequestStageBadge, TransferStatusBadge, ReviewBadge } from "@/components/ui/StatusBadge";
 import { Badge } from "@/components/ui/Badge";
 import { ToolImage } from "@/components/ToolImage";
 import { fmtDate, isOverdue, timeAgo } from "@/lib/utils";
@@ -17,7 +17,7 @@ export function RequestList({ rows, showRequester = true, empty = "No requests."
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="truncate font-bold">{r.parent?.name}</span>
-                <RequestStatusBadge status={r.status} />
+                <RequestStageBadge status={r.status} pick={r.pick} />
               </div>
               <p className="truncate text-xs text-zinc-600 dark:text-zinc-400">
                 {r.request_number} · {r.project?.name}
