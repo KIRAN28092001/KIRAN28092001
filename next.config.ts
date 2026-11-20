@@ -1,9 +1,12 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname : undefined;
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Pin the project root so a stray lockfile in a parent folder is never picked up
+  outputFileTracingRoot: path.join(__dirname),
   poweredByHeader: false,
   images: {
     remotePatterns: supabaseHost ? [{ protocol: "https", hostname: supabaseHost }] : [],
